@@ -3,37 +3,64 @@ This is the template server side for ChatBot
 """
 
 from bottle import route, run, template, static_file, request
-import json
+import urllib
+from urllib.parse import urlencode
 import urllib.request
+import json
 import socket
+from scraper import *
 
 hostname = socket.gethostname()
 IP = socket.gethostbyname(hostname)
 
-twoWay = {"userNames":[]}
-newsConvo = {"engaged":False}
-from urllib.parse import urlencode
+two_way = {"userNames": []}
+newsConvo = {"engaged": False}
 
 
-def checkForWeather(msg):
+# Call weather api to return local weather (based on users ip)
+
+def check_for_weather(msg):
+
+    locate_ip_url = 'http://ipinfo.io/?token=$ec60ac6111cf6a'
+    location = urllib.request.urlopen(locate_ip_url)
+    location = json.loads(location.read().decode('utf-8'))
+
+    url = 'https://api.darksky.net/forecast/aaebe17ba541b0d13aa0118879a8ffe7/+' \
+          + location['loc']
+
+    response = urllib.request.urlopen(url)
+    result = json.loads(response.read().decode('utf-8'))
+
     if ("what" and "weather") in msg.lower().split():
-        return {"animation":"afraid","msg":"Its freezing, you are in Tel Aviv!!"}
+        return {"animation": "afraid", "msg": "The weather today is " + result['currently']['summary'] + ' with ' +
+                str(result['currently']['humidity'])+'% humidity'}
+
     return None
+
+#
 
 def checkForGreeting(msg):
-    greets= ["hello","hi","hey","yo","sup","howdy"]
+
+    greets= ["hello", "hi", "hey", "yo", "sup", "howdy"]
     if any(word in msg.lower().split() for word in greets):
-        return {"animation": "inlove","msg":"Hows it going dude?"}
+        return {"animation": "inlove", "msg": "Hows it going dude?"}
+
     return None
 
-def checkForQuestion(msg):
-    questions = ["what","when","where","why","how","can","may"]
-    if any(word in msg.lower().split() for word in questions):
-        return {"animation": "no","msg":"Thats a good question!"}
 
-def checkForSwears(msg):
-    swears = ["fuck","shit","ass","bitch","whore","hoe","cunt","motherfucker"]
+def check_for_question(msg):
+
+    questions = ["who", "what", "when", "where", "why", "how", "can", "may", "Is", "was", "will", "could", "might"]
+
+    if any(word in msg.lower().split() for word in questions):
+
+        return {"animation": "no", "msg": "That's a good question!"}
+
+# This function checks for swears using neutrinoapi call to return json
+def check_for_swear_words(msg):
+
     url = 'https://neutrinoapi.com/bad-word-filter'
+
     params = {
         'user-id': 'weissberger',
         'api-key': 'ibAgtqSxeuJxGtSue6Jw2gQqcS0MVaiuenzWk1aZAt70RYIp',
@@ -44,83 +71,108 @@ def checkForSwears(msg):
     response = urllib.request.urlopen(url, data=encoded_params)
     result = json.loads(response.read().decode('utf-8'))
 
-    def getReturnString(result):
-        if len(result)>1:
+    def get_boto_reply(result):
+
+        if result['bad-words-total'] > 1:
             plural = "are"
             combiner = " and "
         else:
             plural = "is a"
             combiner = " "
-        return {"animation":"crying","msg":(combiner).join(result) +" "+ plural + " very bad, watch your language it makes me cry"}
 
-    try:
-        if result["is-bad"]:
-            if len(result["bad-words-list"])>1:
-                return getReturnString(result["bad-words-list"])
+        return {"animation": "crying", "msg": combiner.join(result['bad-words-list']) + " " + plural +
+                " very bad word(s), watch your language it makes me cry"}
 
+    if result["is-bad"]:
+        if len(result["bad-words-list"]) >= 1:
+            return get_boto_reply(result)
+
+    else:
         return None
-    except:
-        detectedSwears = [word for word in msg.split() if word in swears]
-        if len(detectedSwears)>1:
-            return getReturnString(detectedSwears)
-        else:
-            return None
 
-def checkForNews(msg):
-    if "news" in msg.split() and newsConvo["engaged"]==False:
+
+# This function checks for news using newsapi.org api call
+def check_for_news(msg):
+
+    if "news" in msg.split() and newsConvo["engaged"] is False:
         newsConvo["engaged"] = True
         return {"animation": "waiting", "msg": "What topic would you like to hear about"}
 
-    elif newsConvo["engaged"] == True:
+    elif newsConvo["engaged"] is True:
         news = json.loads(urllib.request.urlopen(
             "https://newsapi.org/v1/articles?source=cnn&sortBy=top&apiKey=d0ae5510c62d45578cf7f992701ff98f").read().decode(
             'utf-8'))
         try:
-            topicNum = int(msg)-1
+            topic_num = int(msg)-1
             newsConvo["engaged"] = False
-            return {"animation":"ok","msg":[news["articles"][topicNum]["description"] + " here is a link: ",  news["articles"][topicNum]["url"]]}
+            return {"animation": "ok", "msg": [news["articles"][topic_num]["description"] + " here is a link: ",
+                                               news["articles"][topic_num]["url"]]}
         except:
+
             for article in news["articles"]:
                 if msg.lower() in article["title"].lower().split():
                     newsConvo["engaged"] = False
-                    return {"animation":"ok","msg":[article["description"] + " here is a link: ", article["url"]]}
-            topicsStr = "";
-            i=1;
+                    return {"animation": "ok", "msg": [article["description"] + " here is a link: ", article["url"]]}
+            topic_str = ""
+            i = 1
+
             for article in news["articles"]:
-                topicsStr += str(i)+") " + article["title"] + " "
-                i+=1;
-            return {"animation":"waiting","msg":'Couldnt find that topic, please choose from list below: ' + topicsStr}
+                topic_str += str(i)+") " + article["title"] + " "
+                i += 1
+
+            return {"animation": "waiting","msg": 'Could not find that topic, please choose from list below: ' + topic_str}
     else:
         return None
 
 
-def checkForJoke(msg):
+def check_for_joke(msg):
+
     if "joke" in msg.lower().split():
         joke = json.loads(urllib.request.urlopen("http://api.icndb.com/jokes/random/").read().decode('utf-8'))
-        return {"animation":"giggling","msg":joke["value"]["joke"]}
+        return {"animation": "giggling", "msg": joke["value"]["joke"]}
     return None
 
-def checkMessage(msg):
-    weather = checkForWeather(msg)
-    if weather:return weather
 
-    swears = checkForSwears(msg)
-    if swears:return swears
+# This function checks for different user requests.  It then calls various APIs or performs a google search if
+# the user is asking a  question
+
+def check_message(msg):
+
+    joke = check_for_joke(msg)
+    if joke:
+        return joke
+
+    weather = check_for_weather(msg)
+    if weather:
+        return weather
+
+    swears = check_for_swear_words(msg)
+    if swears:
+        return swears
 
     greeting = checkForGreeting(msg)
-    if greeting:return greeting
+    if greeting:
+        return greeting
 
-    news = checkForNews(msg)
-    if news:return news
+    news = check_for_news(msg)
+    if news:
+        return news
 
-    joke = checkForJoke(msg)
-    if joke:return joke
+    # Check for a question, if true scrape google for a result (calling run_scraper from scraper.py)
+    question = check_for_question(msg)
+    if question:
+        search_result = run_scraper(msg.replace('google', ''))
+        return {"animation": "waiting", "msg": search_result[0]['url'] + '\n\n' + search_result[0]['description']}
 
-    question = checkForQuestion(msg)
-    if question:return question
+    # Check for 'google' in message, if true scrape google for a result (calling run_scraper from scraper.py)
+    if 'google' in msg:
+        search_result = run_scraper(msg.replace('google', ''))
+        return {"animation": "waiting", "msg": search_result[0]['url'] + '\n\n' + search_result[0]['description']}
 
     else:
-        return {"animation":"inlove","msg":"I didnt understand that, im a pretty dumb boto"}
+        search_result = run_scraper(msg.replace('google', ''))
+        return {"animation": "waiting", "msg": search_result[0]['url'] + '\n\n' + search_result[0]['description']}
+
 
 @route('/', method='GET')
 def index():
@@ -128,57 +180,64 @@ def index():
 
 
 @route("/setTwoWayMode/<name>")
-def setTwoWayMode(name):
-    for user in twoWay["userNames"]:
-        if user["name"]==name:
+def set_two_way_mode(name):
+
+    for user in two_way["userNames"]:
+        if user["name"] == name:
             user["mode"] = not user["mode"]
-            return;
+            return
+
 
 @route("/createUser/<username>")
-def createUser(username):
-    if username not in [user["name"] for user in twoWay["userNames"]]:
-        twoWay["userNames"].append({"name":username,"mode":True,"inbox":[]})
+def create_user(username):
+    if username not in [user["name"] for user in two_way["userNames"]]:
+        two_way["userNames"].append({"name":username, "mode": True, "inbox": []})
 
 
 @route("/clearInbox/<username>")
-def clearInbox(username):
-    for user in twoWay["userNames"]:
+def clear_inbox(username):
+    for user in two_way["userNames"]:
         if user["name"] == username:
-            user["inbox"] = [];
-            return;
+            user["inbox"] = []
+            return None
+
+# Returns a list of current users (for online screen)
 
 @route("/getUsers")
-def getUsers():
-    return json.dumps(twoWay["userNames"])
+def get_users():
+    return json.dumps(two_way["userNames"])
+
 
 @route("/getUser/<username>")
-def getUser(username):
-    for user in twoWay["userNames"]:
-        if user["name"]==username:
+def get_user(username):
+    for user in two_way["userNames"]:
+        if user["name"] == username:
             return json.dumps(user)
 
+
+# Calls the check_message function if group chat is disabled. If enabled it will check for other user messages and
+# append them to the users inbox.
 @route("/chat/<username>", method='POST')
 def chat(username):
-    for user in twoWay["userNames"]:
-        if user["name"]==username:
+    for user in two_way["userNames"]:
+        if user["name"] == username:
             break
     user_message = request.POST.get('msg')
-    if user["mode"]==False:
-        return json.dumps(checkMessage(user_message))
+
+    if user["mode"] is False:
+        return json.dumps(check_message(user_message))
     else:
 
-        for user in twoWay["userNames"]:
-            if user["name"]!= username:
-                user["inbox"].append({"user":username ,"msg":user_message.replace("?","")})
+        for user in two_way["userNames"]:
+            if user["name"] != username:
+                user["inbox"].append({"user": username, "msg": user_message.replace("?", "")})
+
         return json.dumps({})
-
-
 
 
 @route("/test", method='POST')
 def chat():
-    user_message = request.POST.get('msg') #print this
-
+    user_message = request.POST.get('msg')
 
     return json.dumps({"animation": "inlove", "msg": user_message})
 
@@ -186,7 +245,6 @@ def chat():
 @route('/js/<filename:re:.*\.js>', method='GET')
 def javascripts(filename):
     return static_file(filename, root='js')
-
 
 @route('/css/<filename:re:.*\.css>', method='GET')
 def stylesheets(filename):
@@ -198,7 +256,7 @@ def images(filename):
     return static_file(filename, root='images')
 
 def main():
-    run(host=IP, port=7650)
+    run(host=IP, port=7777)
 
 if __name__ == '__main__':
     main()

@@ -36,7 +36,9 @@ ChatBot.start = function () {
         ChatBot.bindErrorHandlers();
         ChatBot.initSpeechConfig();
         ChatBot.bindUserActions();
-        ChatBot.write("You are in group mode, to talk to me (boto) click the button to the top left of the chat window or copy the url " + ChatBot.SERVER_PATH + " into another browser window to add a user", "boto");
+        ChatBot.write("You are in group mode, to talk to me (boto) click the Group Mode button" +
+        " on the top left of the chat window or copy the url " + ChatBot.SERVER_PATH +
+        " into another browser window to add a user", "boto");
         ChatBot.getMessages();
         });
 };
@@ -71,7 +73,9 @@ ChatBot.bindUserActions = function () {
             $("#twoway").text("Group Mode");
            }
         else{
-            ChatBot.write("Hello im here to help","boto")
+            ChatBot.write("Hello im here to help, you  can ask me for a joke, weather, or search things on google for" +
+            " you. For example, you  may ask me to find you a plumber. Please dont curse at me.",
+            "boto")
             clearInterval(interval);
             $("#twoway").text("Bot Mode");
         }
