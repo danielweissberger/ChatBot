@@ -20,7 +20,7 @@ newsConvo = {"engaged": False}
 # Call weather api to return local weather (based on users ip)
 
 def check_for_weather(msg):
-
+    print(msg)
     locate_ip_url = 'http://ipinfo.io/?token=$ec60ac6111cf6a'
     location = urllib.request.urlopen(locate_ip_url)
     location = json.loads(location.read().decode('utf-8'))
@@ -31,7 +31,8 @@ def check_for_weather(msg):
     response = urllib.request.urlopen(url)
     result = json.loads(response.read().decode('utf-8'))
 
-    if ("what" and "weather") in msg.lower().split():
+    if "weather" in msg.lower().split():
+        print('im in here')
         return {"animation": "afraid", "msg": "The weather today is " + result['currently']['summary'] + ' with ' +
                 str(result['currently']['humidity'])+'% humidity'}
 
@@ -41,7 +42,7 @@ def check_for_weather(msg):
 
 def checkForGreeting(msg):
 
-    greets= ["hello", "hi", "hey", "yo", "sup", "howdy"]
+    greets = ["hello", "hi", "hey", "yo", "sup", "howdy"]
     if any(word in msg.lower().split() for word in greets):
         return {"animation": "inlove", "msg": "Hows it going dude?"}
 
@@ -140,27 +141,33 @@ def check_message(msg):
 
     joke = check_for_joke(msg)
     if joke:
+        print(joke)
         return joke
 
-    weather = check_for_weather(msg)
-    if weather:
-        return weather
+    # weather = check_for_weather(msg)
+    # if weather:
+    #     print(weather)
+    #     return weather
 
     swears = check_for_swear_words(msg)
     if swears:
+        print(swears)
         return swears
-
+    #
     greeting = checkForGreeting(msg)
     if greeting:
+        print(greeting)
         return greeting
 
     news = check_for_news(msg)
     if news:
+        print(news)
         return news
 
     # Check for a question, if true scrape google for a result (calling run_scraper from scraper.py)
     question = check_for_question(msg)
     if question:
+        print(question)
         search_result = run_scraper(msg.replace('google', ''))
         return {"animation": "waiting", "msg": search_result[0]['url'] + '\n\n' + search_result[0]['description']}
 
@@ -256,7 +263,7 @@ def images(filename):
     return static_file(filename, root='images')
 
 def main():
-    run(host=IP, port=7777)
+    run(host=IP, port=7555)
 
 if __name__ == '__main__':
     main()
